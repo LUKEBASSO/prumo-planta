@@ -344,9 +344,9 @@
     let h = '<h2>Contorno do prédio</h2><div class="seg" id="cModo"><button data-m="satelite">Satélite</button><button data-m="medidas">Medidas externas</button><button data-m="croqui">Só o croqui</button></div>';
     if (c.modo === 'satelite') {
       h += '<p class="sub">Coloque a mira em cada canto do <b>telhado</b> e toque em “Marcar canto”. Depois feche o contorno. Se a imagem ficar borrada ou cinza, troque a fonte de imagem.</p>' +
-        '<div class="row" style="margin-bottom:6px"><span class="sub">Imagem:</span><select id="mCam" class="grow" style="font-size:14px;padding:7px 9px"></select></div><div id="mapwrap"><div id="map"></div><div id="mira"></div></div>' +
+        '<div class="row" style="margin-bottom:6px"><span class="sub">Imagem:</span><select id="mCam" class="grow" style="font-size:14px;padding:7px 9px"></select></div><div id="mapwrap"><div id="map"></div><div id="mira"></div><button class="b" id="mGpsMap" title="Minha localização">📍 Minha localização</button></div>' +
         '<div id="maptools"><button class="b p sm" id="mMark">Marcar canto</button><button class="b sm" id="mUndo">Desfazer</button><button class="b sm" id="mClose">Fechar contorno</button><button class="b sm" id="mSq">Esquadrejar</button><button class="b sm d" id="mClear">Recomeçar</button></div>' +
-        '<div class="row"><button class="b sm" id="mGps">📍 Onde estou</button><input type="search" id="mCoord" class="grow" placeholder="Ir para: -11.8642, -55.5025" style="font-size:14px;padding:7px 9px"><button class="b sm" id="mIr">Ir</button></div>';
+        '<div class="row"><input type="search" id="mCoord" class="grow" placeholder="Ir para: -11.8642, -55.5025" style="font-size:14px;padding:7px 9px"><button class="b sm" id="mIr">Ir</button></div>';
     } else if (c.modo === 'medidas') {
       h += '<p class="sub">Sem imagem de satélite: informe as medidas externas do prédio (de quina a quina, pelas paredes).</p>' +
         '<div class="two"><div><label>Largura externa (m)</label><input type="text" inputmode="decimal" id="cLarg" value="' + esc(c.largura) + '"></div><div><label>Comprimento externo (m)</label><input type="text" inputmode="decimal" id="cComp" value="' + esc(c.comprimento) + '"></div></div>';
@@ -423,11 +423,25 @@
       c.roof = o.map(fr.toLatLng); save(); mapDraw(); contRes(); toast('Contorno esquadrejado.');
     };
     $('#mClear').onclick = async () => { if (c.roof.length && !await confirma('Apagar o contorno marcado?', 'Apagar')) return; c.roof = []; c.fechado = false; c.beirais = {}; c.k = null; save(); mapDraw(); contRes(); };
-    $('#mGps').onclick = () => {
-      if (!navigator.geolocation) { toast('Localização indisponível neste navegador.'); return; }
-      toast('Buscando sua localização…');
-      navigator.geolocation.getCurrentPosition(p => map.setView([p.coords.latitude, p.coords.longitude], 19), () => toast('Não consegui obter a localização. Digite a coordenada.'), { enableHighAccuracy: true, timeout: 15000 });
+    let gpsCam = null;
+    const gps = (auto) => {
+      if (!navigator.geolocation) { if (!auto) toast('Localização indisponível neste navegador.'); return; }
+      if (!auto) toast('Buscando sua localização…');
+      navigator.geolocation.getCurrentPosition(p => {
+        if (!map) return;
+        const ll = [p.coords.latitude, p.coords.longitude], acc = p.coords.accuracy || 0;
+        if (gpsCam) map.removeLayer(gpsCam);
+        gpsCam = L.layerGroup([
+          L.circle(ll, { radius: acc, color: '#1a73e8', weight: 1, fillColor: '#1a73e8', fillOpacity: 0.12, interactive: false }),
+          L.circleMarker(ll, { radius: 7, color: '#fff', weight: 2, fillColor: '#1a73e8', fillOpacity: 1, interactive: false })
+        ]).addTo(map);
+        map.setView(ll, Math.max(map.getZoom(), 19));
+        if (!auto) toast('Você está aqui (precisão de ~' + Math.round(acc) + ' m).');
+      }, () => { if (!auto) toast('Não consegui obter a localização. Verifique se o GPS está ligado e se o app tem permissão.', 4000); },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
     };
+    $('#mGpsMap').onclick = () => gps(false);
+    if (!c.roof.length) gps(true);
     const ir = () => { const m = $('#mCoord').value.match(/(-?\d+(?:[.,]\d+)?)[\s,;]+(-?\d+(?:[.,]\d+)?)/); if (!m) { toast('Use o formato: -11.8642, -55.5025'); return; } const la = num(m[1]), lo = num(m[2]); if (Math.abs(la) > 90 || Math.abs(lo) > 180) { toast('Coordenada inválida.'); return; } map.setView([la, lo], 19); };
     $('#mIr').onclick = ir; $('#mCoord').onkeydown = e => { if (e.key === 'Enter') ir(); };
     mapDraw();
