@@ -230,6 +230,13 @@
       roof = loc; out.beirais = dists;
       walls = G.inset(roof, dists);
       out.georef = { lat0, lng0 };
+    } else if (c.modo === 'arext') {
+      if (!c.ext || c.ext.length < 3) { out.motivo = 'Meça o contorno externo com o AR: dê a volta no prédio marcando cada quina.'; return out; }
+      const g = c.extGeo, rot = ((g && +g.rot) || 0) * Math.PI / 180;
+      const anc = g && g.anchor === 0 ? c.ext[0] : G.centroid(c.ext);
+      walls = G.ccw(c.ext.map(p => G.rot([p[0] - anc[0], p[1] - anc[1]], rot)));
+      roof = G.inset(walls, -beiral); out.beirais = walls.map(() => beiral);
+      if (g && isFinite(g.lat) && isFinite(g.lng)) { frame = G.localFrame(+g.lat, +g.lng); out.georef = { lat0: +g.lat, lng0: +g.lng }; }
     } else if (c.modo === 'medidas') {
       const W = N(c.largura), L = N(c.comprimento);
       if (!(W > 0 && L > 0)) { out.motivo = 'Informe a largura e o comprimento externos do prédio.'; return out; }
