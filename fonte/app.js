@@ -175,6 +175,10 @@
       $('#sEx').onclick = async () => { if (!await confirma('Excluir o cômodo “' + r.nome + '”?')) return; P.rooms = P.rooms.filter(x => x !== r); sel = null; save(); cqRender(); };
     }
   }
+  function proxNome() {
+    const n = P.rooms.reduce((m, r) => { const k = /^Cômodo (\d+)$/.exec(r.nome); return k ? Math.max(m, +k[1]) : m; }, 0);
+    return 'Cômodo ' + (n + 1);
+  }
   function mover(r, dx, dy) { if (r.rect) { r.x += dx; r.y += dy; } else r.pts = r.pts.map(p => [p[0] + dx, p[1] + dy]); }
   function girar(r) {
     if (r.rect) { const cx = r.x + r.w / 2, cy = r.y + r.h / 2, w = r.h, h = r.w; r.w = w; r.h = h; r.x = cx - w / 2; r.y = cy - h / 2; }
@@ -304,7 +308,7 @@
     }
     $('#rC', s).onclick = sheetClose;
     $('#rOk', s).onclick = () => {
-      const nome = iN.value.trim() || 'Cômodo ' + (P.rooms.length + (novo ? 1 : 0));
+      const nome = iN.value.trim() || (novo ? proxNome() : r.nome);
       if (poli) { r.nome = nome; }
       else {
         const w = num(iW.value), hh = num(iH.value);
@@ -604,7 +608,7 @@
       const c = AR.cur && S(AR.cur);
       if (c) { ctx.strokeStyle = '#fff'; ctx.beginPath(); ctx.arc(c[0], c[1], 14 * dpr, 0, 7); ctx.stroke(); ctx.fillStyle = '#ffd400'; ctx.beginPath(); ctx.arc(c[0], c[1], 4 * dpr, 0, 7); ctx.fill(); }
       $('#artop').textContent = !AR.cur ? 'Mova o celular devagar, apontando para o piso, até aparecer o círculo.' :
-        AR.pts.length ? 'Cômodo ' + (AR.polys.length + 1) + ': ' + AR.pts.length + ' canto(s). Aponte para o próximo canto no piso.' : 'Aponte o círculo para um canto do cômodo, no piso, e toque em “Marcar canto”.';
+        AR.pts.length ? 'Cômodo ' + (AR.polys.length + 1) + ': ' + AR.pts.length + ' canto(s). Aponte para o próximo canto no piso.' : (AR.polys.length ? AR.polys.length + ' cômodo(s) medidos. Vá para o próximo cômodo sem sair do AR e marque o primeiro canto.' : 'Aponte o círculo para um canto do cômodo, no piso, e toque em “Marcar canto”. Meça todos os cômodos nesta mesma sessão: assim eles já chegam montados.');
     };
     sess.requestAnimationFrame(loop);
   }
@@ -627,7 +631,7 @@
       pts = pts.map(p => [p[0] + ox, p[1] + oy]);
       const proprio = G.dominantAngle(pts), alinhado = Math.abs(proprio) < 10 * Math.PI / 180;
       const o = G.orthogonalize(pts, alinhado ? 0 : null);
-      const room = { id: uid(), nome: 'Cômodo ' + (P.rooms.length + 1), fotos: [] };
+      const room = { id: uid(), nome: proxNome(), fotos: [] };
       if (o && o.length === 4 && alinhado) { const b = G.bbox(o); Object.assign(room, { rect: true, x: b.minx, y: b.miny, w: b.w, h: b.h }); }
       else Object.assign(room, { rect: false, pts: o || pts });
       P.rooms.push(room);

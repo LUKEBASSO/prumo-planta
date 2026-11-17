@@ -63,6 +63,7 @@
 
   /* Esquadreja um polígono: todas as paredes ficam paralelas ou perpendiculares
      à direção dominante. Devolve null se o polígono não for "quase ortogonal". */
+  G.MIN_EDGE = 0.20;
   G.orthogonalize = function (pts, forceAng) {
     if (pts.length < 4) return null;
     const ang = forceAng != null ? forceAng : G.dominantAngle(pts);
@@ -82,12 +83,31 @@
       if (!removed) break;
       if (r.length < 4) return null;
     }
-    const c = cls(r), n = r.length;
+    let c = cls(r), n = r.length;
     if (n < 4 || n % 2) return null;
-    const val = c.map((k, i) => {
+    let val = c.map((k, i) => {
       const a = r[i], b = r[(i + 1) % n];
       return k === 'H' ? (a[1] + b[1]) / 2 : (a[0] + b[0]) / 2;
     });
+    // remove degraus/dentes menores que minEdge (ruído do AR): a parede curta some
+    // e as duas paredes vizinhas, paralelas, viram uma só
+    const minEdge = G.MIN_EDGE;
+    for (let it = 0; it < 100 && n > 4; it++) {
+      let best = -1, bl = minEdge;
+      for (let i = 0; i < n; i++) {
+        const L = Math.abs(val[(i + 1) % n] - val[(i - 1 + n) % n]);
+        if (L < bl) { bl = L; best = i; }
+      }
+      if (best < 0) break;
+      const ip = (best - 1 + n) % n, inx = (best + 1) % n;
+      const lp = Math.abs(val[best] - val[(ip - 1 + n) % n]), ln = Math.abs(val[(inx + 1) % n] - val[best]);
+      val[ip] = (val[ip] * lp + val[inx] * ln) / ((lp + ln) || 1);
+      const rm = [best, inx].sort((a, b) => b - a);
+      for (const k of rm) { val.splice(k, 1); c.splice(k, 1); }
+      n = val.length;
+    }
+    if (n < 4) return null;
+    r = new Array(n).fill(0);
     const out = r.map((p, i) => {
       const prev = (i - 1 + n) % n;
       return c[i] === 'H' ? [val[prev], val[i]] : [val[i], val[prev]];
@@ -224,7 +244,20 @@
     if (!inner) inner = G.inset(walls, esp);
     if (G.area(walls) <= 0 || G.area(inner) <= 0) { out.motivo = 'O recuo do beiral ficou maior que o prédio. Revise os valores.'; return out; }
 
-    if (src && src.w > 0.01 && src.h > 0.01) {
+    if (rooms.length > 1) { // cômodos encostados? (grafo de vizinhança)
+      const tol = esp + 0.30, bb = rooms.map(r => G.bbox(r.src)), vis = [0], seen = new Set([0]);
+      while (vis.length) {
+        const i = vis.pop();
+        for (let j = 0; j < rooms.length; j++) if (!seen.has(j)) {
+          const a = bb[i], b = bb[j];
+          if (a.minx - tol <= b.maxx && b.minx - tol <= a.maxx && a.miny - tol <= b.maxy && b.miny - tol <= a.maxy) { seen.add(j); vis.push(j); }
+        }
+      }
+      out.soltos = seen.size < rooms.length;
+    }
+    if (out.soltos && c.modo !== 'croqui') {
+      out.avisos.push('Os cômodos estão soltos no croqui, sem encostar uns nos outros. Monte a casa na aba Croqui, arrastando os cômodos até se encaixarem. Até lá, a planta sai só com o contorno externo.');
+    } else if (src && src.w > 0.01 && src.h > 0.01) {
       if (c.modo === 'croqui') {
         out.rooms = rooms.map(r => ({ id: r.id, nome: r.nome, pts: r.src }));
         out.fit = { sx: 1, sy: 1, k: 0 };
