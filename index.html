@@ -1489,8 +1489,8 @@ tr.tot td{font-weight:700;background:#fafcfb}
     if (map) { map.remove(); map = null; }
     let h = '<h2>Contorno do prédio</h2><div class="seg" id="cModo"><button data-m="satelite">Satélite</button><button data-m="medidas">Medidas externas</button><button data-m="croqui">Só o croqui</button></div>';
     if (c.modo === 'satelite') {
-      h += '<p class="sub">Coloque a mira em cada canto do <b>telhado</b> e toque em “Marcar canto”. Depois feche o contorno.</p>' +
-        '<div id="mapwrap"><div id="map"></div><div id="mira"></div></div>' +
+      h += '<p class="sub">Coloque a mira em cada canto do <b>telhado</b> e toque em “Marcar canto”. Depois feche o contorno. Se a imagem ficar borrada ou cinza, troque a fonte de imagem.</p>' +
+        '<div class="row" style="margin-bottom:6px"><span class="sub">Imagem:</span><select id="mCam" class="grow" style="font-size:14px;padding:7px 9px"></select></div><div id="mapwrap"><div id="map"></div><div id="mira"></div></div>' +
         '<div id="maptools"><button class="b p sm" id="mMark">Marcar canto</button><button class="b sm" id="mUndo">Desfazer</button><button class="b sm" id="mClose">Fechar contorno</button><button class="b sm" id="mSq">Esquadrejar</button><button class="b sm d" id="mClear">Recomeçar</button></div>' +
         '<div class="row"><button class="b sm" id="mGps">📍 Onde estou</button><input type="search" id="mCoord" class="grow" placeholder="Ir para: -11.8642, -55.5025" style="font-size:14px;padding:7px 9px"><button class="b sm" id="mIr">Ir</button></div>';
     } else if (c.modo === 'medidas') {
@@ -1539,7 +1539,17 @@ tr.tot td{font-weight:700;background:#fafcfb}
     try { const u = JSON.parse(pref.get('centro')); if (u && isFinite(u[0])) { centro = [u[0], u[1]]; zoom = u[2] || 18; } } catch (e) { }
     map = L.map('map', { maxZoom: 22, zoomSnap: 0.5, attributionControl: true }).setView(centro, zoom);
     map.zoomControl.setPosition('bottomright');
-    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 19, maxZoom: 22, attribution: 'Imagem: Esri, Maxar, Earthstar Geographics' }).addTo(map);
+    const camadas = {
+      'Google Satélite': L.tileLayer('https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { subdomains: '0123', maxNativeZoom: 21, maxZoom: 22, attribution: 'Imagem: Google' }),
+      'Google Híbrido': L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { subdomains: '0123', maxNativeZoom: 21, maxZoom: 22, attribution: 'Imagem: Google' }),
+      'Esri World Imagery': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 19, maxZoom: 22, attribution: 'Imagem: Esri, Maxar, Earthstar Geographics' }),
+      'Esri Clarity': L.tileLayer('https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 19, maxZoom: 22, attribution: 'Imagem: Esri Clarity' })
+    };
+    const nomeCam = camadas[pref.get('camada')] ? pref.get('camada') : 'Google Satélite';
+    let camAtual = camadas[nomeCam].addTo(map);
+    const selCam = $('#mCam');
+    selCam.innerHTML = Object.keys(camadas).map(n => '<option' + (n === nomeCam ? ' selected' : '') + '>' + n + '</option>').join('');
+    selCam.onchange = () => { map.removeLayer(camAtual); camAtual = camadas[selCam.value].addTo(map); pref.set('camada', selCam.value); };
     mapG = L.layerGroup().addTo(map);
     map.on('moveend', () => { const ct = map.getCenter(); pref.set('centro', JSON.stringify([ct.lat, ct.lng, map.getZoom()])); });
     if (c.roof.length) map.fitBounds(L.latLngBounds(c.roof).pad(0.6), { maxZoom: 21 });
