@@ -40,6 +40,7 @@ import java.io.File
 class MainActivity : ComponentActivity() {
 
     private lateinit var web: WebView
+    private lateinit var tiles: TileStore
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private var fileParams: WebChromeClient.FileChooserParams? = null
     private var cameraUri: Uri? = null
@@ -79,8 +80,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        tiles = TileStore(this)
         val loader = WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .addPathHandler("/tiles/", tiles)
             .build()
 
         web = WebView(this)
@@ -240,6 +243,22 @@ class MainActivity : ComponentActivity() {
                 .build()
             pm.print(nome, web.createPrintDocumentAdapter(nome), attrs)
         }
+
+        @JavascriptInterface
+        fun baixarArea(fonte: String, sul: Double, oeste: Double, norte: Double, leste: Double, zMin: Int, zMax: Int) {
+            tiles.baixarArea(fonte, sul, oeste, norte, leste, zMin, zMax) { f, t, e, fim ->
+                js("window.__tilesProg && window.__tilesProg($f,$t,$e,$fim)")
+            }
+        }
+
+        @JavascriptInterface
+        fun cancelarDownload() = tiles.cancelar()
+
+        @JavascriptInterface
+        fun infoTiles(): String = tiles.info()
+
+        @JavascriptInterface
+        fun apagarTiles() = tiles.apagar()
 
         @JavascriptInterface
         fun ouvir() = runOnUiThread {

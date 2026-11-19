@@ -354,7 +354,7 @@
     let h = '<h2>Contorno do prédio</h2><div class="seg" id="cModo"><button data-m="satelite">Satélite</button><button data-m="arext">AR externo</button><button data-m="medidas">Medidas</button><button data-m="croqui">Só o croqui</button></div>';
     if (c.modo === 'satelite') {
       h += '<p class="sub"><b>Toque em cada canto do telhado</b> na imagem (ou use a mira e “Marcar canto”). Depois toque em “Fechar contorno”. Se a imagem ficar borrada ou cinza, troque a fonte de imagem.</p>' +
-        '<div class="row" style="margin-bottom:6px"><span class="sub">Imagem:</span><select id="mCam" class="grow" style="font-size:14px;padding:7px 9px"></select></div><div id="mapwrap"><div id="map"></div><div id="mira"></div><button class="b" id="mGpsMap" title="Minha localização">📍 Minha localização</button></div>' +
+        '<div class="row" style="margin-bottom:6px"><span class="sub">Imagem:</span><select id="mCam" class="grow" style="font-size:14px;padding:7px 9px"></select>' + (NAT ? '<button class="b sm" id="mOff">⬇ Offline</button>' : '') + '</div><div id="mapwrap"><div id="map"></div><div id="mira"></div><button class="b" id="mGpsMap" title="Minha localização">📍 Minha localização</button></div>' +
         '<div id="maptools"><button class="b p sm" id="mMark">Marcar canto</button><button class="b sm" id="mUndo">Desfazer</button><button class="b sm" id="mClose">Fechar contorno</button><button class="b sm" id="mSq">Esquadrejar</button><button class="b sm d" id="mClear">Recomeçar</button></div>' +
         '<div class="row"><input type="search" id="mCoord" class="grow" placeholder="Ir para: -11.8642, -55.5025" style="font-size:14px;padding:7px 9px"><button class="b sm" id="mIr">Ir</button></div>';
     } else if (c.modo === 'arext') {
@@ -364,7 +364,7 @@
       if (tem) {
         h += '<h2>Posição no mapa <span class="sub">(opcional: para KML e DXF georreferenciado)</span></h2>' +
           '<p class="sub">Arraste o mapa até a mira ficar sobre o prédio e toque em “Centralizar na mira”, ou fique de pé na quina 1 e use o GPS. Depois gire até alinhar com a imagem.</p>' +
-          '<div class="row" style="margin-bottom:6px"><span class="sub">Imagem:</span><select id="mCam" class="grow" style="font-size:14px;padding:7px 9px"></select></div><div id="mapwrap"><div id="map"></div><div id="mira"></div><button class="b" id="mGpsMap" title="Minha localização">📍 Minha localização</button></div>' +
+          '<div class="row" style="margin-bottom:6px"><span class="sub">Imagem:</span><select id="mCam" class="grow" style="font-size:14px;padding:7px 9px"></select>' + (NAT ? '<button class="b sm" id="mOff">⬇ Offline</button>' : '') + '</div><div id="mapwrap"><div id="map"></div><div id="mira"></div><button class="b" id="mGpsMap" title="Minha localização">📍 Minha localização</button></div>' +
           '<div id="maptools"><button class="b sm p" id="eMira">Centralizar na mira</button><button class="b sm" id="eGps">📍 GPS na quina 1 (média 15 s)</button><button class="b sm d" id="eTira">Tirar do mapa</button></div>' +
           '<label>Girar (graus): <b id="eRotV">' + fmt(+((c.extGeo || {}).rot || 0), 0) + '°</b></label><input type="range" id="eRot" min="-180" max="180" step="0.5" value="' + (+((c.extGeo || {}).rot || 0)) + '" style="width:100%">';
       }
@@ -424,17 +424,21 @@
     try { const u = JSON.parse(pref.get('centro')); if (u && isFinite(u[0])) { centro = [u[0], u[1]]; zoom = u[2] || 18; } } catch (e) { }
     map = L.map('map', { maxZoom: 22, zoomSnap: 0.5, attributionControl: true }).setView(centro, zoom);
     map.zoomControl.setPosition('bottomright');
+    // No app Android as imagens passam pelo cache do aparelho (funcionam offline depois de baixadas)
+    const T = (fonte, url) => NAT ? 'https://appassets.androidplatform.net/tiles/' + fonte + '/{z}/{x}/{y}' : url;
     const camadas = {
-      'Google Satélite': L.tileLayer('https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { subdomains: '0123', maxNativeZoom: 21, maxZoom: 22, attribution: 'Imagem: Google' }),
-      'Google Híbrido': L.tileLayer('https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { subdomains: '0123', maxNativeZoom: 21, maxZoom: 22, attribution: 'Imagem: Google' }),
-      'Esri World Imagery': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 19, maxZoom: 22, attribution: 'Imagem: Esri, Maxar, Earthstar Geographics' }),
-      'Esri Clarity': L.tileLayer('https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxNativeZoom: 19, maxZoom: 22, attribution: 'Imagem: Esri Clarity' })
+      'Google Satélite': L.tileLayer(T('g', 'https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}'), { subdomains: '0123', maxNativeZoom: NAT ? 20 : 21, maxZoom: 22, attribution: 'Imagem: Google' }),
+      'Google Híbrido': L.tileLayer(T('h', 'https://mt{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}'), { subdomains: '0123', maxNativeZoom: NAT ? 20 : 21, maxZoom: 22, attribution: 'Imagem: Google' }),
+      'Esri World Imagery': L.tileLayer(T('e', 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'), { maxNativeZoom: 19, maxZoom: 22, attribution: 'Imagem: Esri, Maxar, Earthstar Geographics' }),
+      'Esri Clarity': L.tileLayer(T('c', 'https://clarity.maptiles.arcgis.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'), { maxNativeZoom: 19, maxZoom: 22, attribution: 'Imagem: Esri Clarity' })
     };
     const nomeCam = camadas[pref.get('camada')] ? pref.get('camada') : 'Google Satélite';
     let camAtual = camadas[nomeCam].addTo(map);
     const selCam = $('#mCam');
     selCam.innerHTML = Object.keys(camadas).map(n => '<option' + (n === nomeCam ? ' selected' : '') + '>' + n + '</option>').join('');
     selCam.onchange = () => { map.removeLayer(camAtual); camAtual = camadas[selCam.value].addTo(map); pref.set('camada', selCam.value); };
+    const FONTE = { 'Google Satélite': 'g', 'Google Híbrido': 'h', 'Esri World Imagery': 'e', 'Esri Clarity': 'c' };
+    if ($('#mOff')) $('#mOff').onclick = () => offlineSheet(FONTE[selCam.value], selCam.value, camadas[selCam.value].options.maxNativeZoom);
     mapG = L.layerGroup().addTo(map);
     map.on('moveend', () => { const ct = map.getCenter(); pref.set('centro', JSON.stringify([ct.lat, ct.lng, map.getZoom()])); });
     if (bounds) map.fitBounds(bounds, { maxZoom: 21 });
@@ -526,6 +530,42 @@
       }, fim - Date.now());
     };
     mapDraw();
+  }
+  /* ---------- imagens offline (app Android) ---------- */
+  function tilesNaArea(b, zMin, zMax) {
+    const tx = (lng, z) => Math.floor((lng + 180) / 360 * 2 ** z);
+    const ty = (lat, z) => { const r = lat * Math.PI / 180; return Math.floor((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 2 ** z); };
+    let n = 0;
+    for (let z = zMin; z <= zMax; z++) n += (tx(b.getEast(), z) - tx(b.getWest(), z) + 1) * (ty(b.getSouth(), z) - ty(b.getNorth(), z) + 1);
+    return n;
+  }
+  function offlineSheet(fonte, nome, zMax) {
+    if (!NAT || !map) return;
+    const b = map.getBounds(), zMin = Math.max(12, Math.min(16, Math.floor(map.getZoom()) - 2));
+    const n = tilesNaArea(b, zMin, zMax), mb = n * 0.025;
+    let info = { n: 0, mb: 0 }; try { info = JSON.parse(NAT.infoTiles()); } catch (e) { }
+    const lado = (G.dist([0, 0], G.localFrame(b.getSouth(), b.getWest()).toLocal([b.getNorth(), b.getWest()]))), larg = G.dist([0, 0], G.localFrame(b.getSouth(), b.getWest()).toLocal([b.getSouth(), b.getEast()]));
+    const s = sheet('<h3>Baixar imagem para usar offline</h3>' +
+      '<p>Área visível no mapa agora: <b>' + fmt(larg / 1000, 2) + ' × ' + fmt(lado / 1000, 2) + ' km</b>, imagem <b>' + esc(nome) + '</b>, zoom ' + zMin + ' a ' + zMax + '.</p>' +
+      '<p>' + n.toLocaleString('pt-BR') + ' imagens, cerca de <b>' + fmt(mb, 0) + ' MB</b>. Use Wi-Fi.</p>' +
+      (n > 30000 ? '<div class="aviso">Área grande demais para o zoom máximo. Aproxime o mapa só sobre o local da vistoria e tente de novo.</div>' : '') +
+      '<p class="sub">Dica: deixe na tela só o imóvel ou o bairro da vistoria. Tudo o que você já olhou no mapa com internet também fica salvo.</p>' +
+      '<div id="offProg" class="ok" style="display:none"></div>' +
+      '<div class="row" style="margin-top:12px"><button class="b grow" id="offFechar">Fechar</button><button class="b p grow" id="offIr"' + (n > 30000 ? ' disabled' : '') + '>Baixar</button></div>' +
+      '<p class="sub" style="margin-top:14px">Já salvo no aparelho: <b id="offInfo">' + info.n.toLocaleString('pt-BR') + ' imagens (' + fmt(info.mb, 0) + ' MB)</b> <button class="b sm d" id="offApagar">Apagar tudo</button></p>');
+    $('#offFechar', s).onclick = sheetClose;
+    $('#offApagar', s).onclick = () => { NAT.apagarTiles(); $('#offInfo', s).textContent = '0 imagens'; toast('Imagens offline apagadas.'); };
+    $('#offIr', s).onclick = () => {
+      const bt = $('#offIr', s);
+      if (bt.dataset.on) { NAT.cancelarDownload(); return; }
+      bt.dataset.on = '1'; bt.textContent = 'Cancelar download';
+      const pr = $('#offProg', s); pr.style.display = 'block'; pr.textContent = 'Iniciando…';
+      window.__tilesProg = (feitos, total, erros, fim) => {
+        const el = $('#offProg'); if (el) el.textContent = (fim ? 'Concluído: ' : 'Baixando: ') + feitos.toLocaleString('pt-BR') + ' de ' + total.toLocaleString('pt-BR') + (erros ? ' (' + erros + ' falharam)' : '');
+        if (fim) { const b2 = $('#offIr'); if (b2) { delete b2.dataset.on; b2.textContent = 'Baixar'; } toast(erros && erros === total ? 'Não foi possível baixar. Verifique a internet.' : 'Imagens salvas. Já dá para usar sem internet.', 4000); }
+      };
+      NAT.baixarArea(fonte, b.getSouth(), b.getWest(), b.getNorth(), b.getEast(), zMin, zMax);
+    };
   }
   function mapDraw() {
     if (map && P && P.cont.modo === 'arext') {
