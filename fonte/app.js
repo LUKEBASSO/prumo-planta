@@ -8,6 +8,7 @@
   const num = s => { const v = parseFloat(String(s).replace(/\s/g, '').replace(',', '.')); return isFinite(v) ? v : NaN; };
   const pct = s => { const v = (s - 1) * 100; return (v >= 0 ? '+' : '−') + fmt(Math.abs(v), 1) + '%'; };
   const uid = () => 'i' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  const NAT = window.PrumoAndroid || null; // presente só dentro do app Android
   const NOMES = ['Recepção', 'Escritório', 'Banheiro', 'Depósito', 'Produção', 'Oficina', 'Cozinha', 'Refeitório', 'Vestiário', 'Almoxarifado', 'Estoque', 'Sala', 'Circulação', 'Área de resíduos'];
 
   /* ---------- armazenamento ---------- */
@@ -58,6 +59,7 @@
     });
   }
   function baixar(nome, conteudo, mime) {
+    if (NAT && typeof conteudo === 'string') { NAT.saveFile(nome, conteudo, mime || 'text/plain'); return; }
     const blob = conteudo instanceof Blob ? conteudo : new Blob([conteudo], { type: mime || 'text/plain' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome;
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
@@ -246,7 +248,10 @@
   window.addEventListener('resize', () => { if (viewAtual === 'croqui') cqRender(); });
 
   /* voz */
+  let vozCb = null;
+  window.__voz = t => { const cb = vozCb; vozCb = null; if (t && cb) cb(t); };
   function ouvir(cb) {
+    if (NAT) { vozCb = cb; NAT.ouvir(); return; }
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { toast('Este navegador não tem ditado por voz. Digite a medida.'); return; }
     try {
@@ -636,7 +641,7 @@
       '<h4>Identificação</h4><table>' + linha('Cliente', cb.cliente) + linha('Endereço', cb.endereco) + linha('Município', cb.municipio) + linha('Centro do prédio', coord) + linha('Resp. técnico', cb.resp) + linha('Registro', cb.registro) + '</table>' +
       '<div class="nota"><b>Notas:</b> 1) Beiral adotado: ' + beiralTxt(C) + '. 2) A área de projeção da cobertura corresponde à visualizada em imagem de satélite e inclui beirais; a área construída é medida pelas faces externas das paredes. ' +
       '3) Linha tracejada: projeção da cobertura. Cotas em metros. 4) Levantamento expedito para representação do layout da atividade; não substitui projeto arquitetônico.</div></div></div>';
-    setTimeout(() => { try { window.print(); } catch (e) { toast('Não foi possível abrir a impressão neste navegador.'); } }, 80);
+    setTimeout(() => { if (NAT) { NAT.print('Planta ' + P.nome); return; } try { window.print(); } catch (e) { toast('Não foi possível abrir a impressão neste navegador.'); } }, 80);
   }
 
   /* ---------- AR (WebXR, Chrome no Android com ARCore) ---------- */
@@ -649,7 +654,13 @@
     if (!ok) return no('Este aparelho não é compatível com ARCore, ou o “Google Play Services para RA” não está instalado.');
     return true;
   }
+  let arCbNat = null;
+  window.__arResult = s => { const cb = arCbNat; arCbNat = null; let v = null; try { v = JSON.parse(s); } catch (e) { } if (v != null && cb) cb(v); };
   async function arAbrir(modo, cb) {
+    if (NAT) {
+      if (!NAT.arDisponivel()) { sheet('<h3>AR indisponível</h3><p>Este aparelho não é compatível com ARCore.</p><div class="row" style="margin-top:12px"><button class="b p grow" id="arNoOk">Entendi</button></div>'); $('#arNoOk').onclick = sheetClose; return; }
+      arCbNat = cb; NAT.startAr(modo); return;
+    }
     if (!await arPode()) return;
     try { await arStart(modo, cb); } catch (e) { $('#ar').classList.remove('on'); AR.sess = null; toast('Não foi possível iniciar o AR: ' + (e && e.message || e), 5000); }
   }
@@ -769,12 +780,18 @@
     save(); cqFit();
   }
 
+  window.__voltar = () => { // botão voltar do Android
+    if ($('#sheetbg').classList.contains('on')) { sheetClose(); return true; }
+    if (viewAtual !== 'proj') { go(viewAtual === 'croqui' ? 'proj' : viewAtual === 'cont' ? 'croqui' : 'cont'); return true; }
+    return false;
+  };
+
   /* ---------- início ---------- */
   window.__pp = { get P() { return P; }, set P(v) { P = v; }, go, AR, arFim, arParaCroqui, numsFala, plantaSVG, get lista() { return lista; } };
   (async function () {
     await DB.open(); lista = await DB.all();
     const u = pref.get('ultimo'); if (u && lista.find(x => x.id === u)) P = lista.find(x => x.id === u);
     go('proj');
-    if ('serviceWorker' in navigator && (location.protocol === 'https:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname))) navigator.serviceWorker.register('sw.js').catch(() => { });
+    if (!NAT && 'serviceWorker' in navigator && (location.protocol === 'https:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname))) navigator.serviceWorker.register('sw.js').catch(() => { });
   })();
 })();
