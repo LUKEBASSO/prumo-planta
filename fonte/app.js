@@ -354,9 +354,9 @@
     let h = '<h2>Contorno do prédio</h2><div class="seg" id="cModo"><button data-m="satelite">Satélite</button><button data-m="arext">AR externo</button><button data-m="medidas">Medidas</button><button data-m="croqui">Só o croqui</button></div>';
     if (c.modo === 'satelite') {
       h += '<p class="sub"><b>Toque em cada canto do telhado</b> na imagem (ou use a mira e “Marcar canto”). Depois toque em “Fechar contorno”. Se a imagem ficar borrada ou cinza, troque a fonte de imagem.</p>' +
-        '<div class="row" style="margin-bottom:6px"><span class="sub">Imagem:</span><select id="mCam" class="grow" style="font-size:14px;padding:7px 9px"></select>' + (NAT ? '<button class="b sm" id="mOff">⬇ Offline</button>' : '') + '</div><div id="mapwrap"><div id="map"></div><div id="mira"></div><button class="b" id="mGpsMap" title="Minha localização">📍 Minha localização</button></div>' +
+        '<div class="row" style="margin-bottom:6px"><span class="sub">Imagem:</span><select id="mCam" class="grow" style="font-size:14px;padding:7px 9px"></select>' + (NAT ? '<button class="b sm" id="mOff">⬇ Offline</button>' : '') + '</div><div id="mapwrap"><div id="map"></div><div id="mira"></div><button class="b" id="mGpsMap" title="Minha localização">📍 Minha localização</button><button id="mCoordVal" title="Toque para trocar o formato"></button></div>' +
         '<div id="maptools"><button class="b p sm" id="mMark">Marcar canto</button><button class="b sm" id="mUndo">Desfazer</button><button class="b sm" id="mClose">Fechar contorno</button><button class="b sm" id="mSq">Esquadrejar</button><button class="b sm d" id="mClear">Recomeçar</button></div>' +
-        '<div class="row"><input type="search" id="mCoord" class="grow" placeholder="Ir para: -11.8642, -55.5025" style="font-size:14px;padding:7px 9px"><button class="b sm" id="mIr">Ir</button></div>';
+        '<div class="row"><input type="search" id="mCoord" class="grow" placeholder="Ir para: -11.8642, -55.5025 ou 11°51&#39;51&quot;S 55°30&#39;09&quot;W" style="font-size:14px;padding:7px 9px"><button class="b sm" id="mIr">Ir</button></div>';
     } else if (c.modo === 'arext') {
       const tem = c.ext && c.ext.length >= 3;
       h += '<p class="sub">Do lado de fora, dê <b>uma volta</b> no prédio marcando com o AR o pé da parede em cada quina, numa sessão só. Sem móveis no caminho, a medida externa sai bem melhor que a interna.</p>' +
@@ -419,6 +419,7 @@
     mapBase(c.roof.length ? L.latLngBounds(c.roof).pad(0.6) : null, !c.roof.length);
     mapInitSat();
   }
+  function fmtC() { const f = pref.get('fmtc'); return f === 'dec' || f === 'utm' ? f : 'gms'; }
   function mapBase(bounds, autoGps) {
     let centro = [-11.8642, -55.5025], zoom = 15;
     try { const u = JSON.parse(pref.get('centro')); if (u && isFinite(u[0])) { centro = [u[0], u[1]]; zoom = u[2] || 18; } } catch (e) { }
@@ -434,6 +435,9 @@
     };
     const nomeCam = camadas[pref.get('camada')] ? pref.get('camada') : 'Google Satélite';
     let camAtual = camadas[nomeCam].addTo(map);
+    const cv = $('#mCoordVal');
+    const mostra = () => { if (!map || !cv) return; const ct = map.getCenter(); cv.textContent = '⌖ ' + G.fmtCoord(ct.lat, ct.lng, fmtC()); };
+    if (cv) { cv.onclick = () => { const o = ['gms', 'dec', 'utm'], i = o.indexOf(fmtC()); pref.set('fmtc', o[(i + 1) % 3]); mostra(); toast({ gms: 'Graus, minutos e segundos', dec: 'Graus decimais', utm: 'UTM (SIRGAS 2000)' }[fmtC()]); }; map.on('move', mostra); mostra(); }
     const selCam = $('#mCam');
     selCam.innerHTML = Object.keys(camadas).map(n => '<option' + (n === nomeCam ? ' selected' : '') + '>' + n + '</option>').join('');
     selCam.onchange = () => { map.removeLayer(camAtual); camAtual = camadas[selCam.value].addTo(map); pref.set('camada', selCam.value); };
@@ -455,7 +459,7 @@
           L.circleMarker(ll, { radius: 7, color: '#fff', weight: 2, fillColor: '#1a73e8', fillOpacity: 1, interactive: false })
         ]).addTo(map);
         map.setView(ll, Math.max(map.getZoom(), 19));
-        if (!auto) toast('Você está aqui (precisão de ~' + Math.round(acc) + ' m).');
+        if (!auto) toast('Você está aqui: ' + G.fmtCoord(ll[0], ll[1], fmtC()) + ' (precisão ~' + Math.round(acc) + ' m)', 5000);
       }, () => { if (!auto) toast('Não consegui obter a localização. Verifique se o GPS está ligado e se o app tem permissão.', 4000); },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
     };
@@ -485,7 +489,7 @@
       c.roof = o.map(fr.toLatLng); save(); mapDraw(); contRes(); toast('Contorno esquadrejado.');
     };
     $('#mClear').onclick = async () => { if (c.roof.length && !await confirma('Apagar o contorno marcado?', 'Apagar')) return; c.roof = []; c.fechado = false; c.beirais = {}; c.k = null; save(); mapDraw(); contRes(); };
-    const ir = () => { const m = $('#mCoord').value.match(/(-?\d+(?:[.,]\d+)?)[\s,;]+(-?\d+(?:[.,]\d+)?)/); if (!m) { toast('Use o formato: -11.8642, -55.5025'); return; } const la = num(m[1]), lo = num(m[2]); if (Math.abs(la) > 90 || Math.abs(lo) > 180) { toast('Coordenada inválida.'); return; } map.setView([la, lo], 19); };
+    const ir = () => { const c2 = G.parseCoord($('#mCoord').value); if (!c2) { toast('Não entendi a coordenada. Exemplos: -11.8642, -55.5025 ou 11°51\'51"S 55°30\'09"W', 5000); return; } map.setView(c2, 19); toast(G.fmtCoord(c2[0], c2[1], fmtC())); };
     $('#mIr').onclick = ir; $('#mCoord').onkeydown = e => { if (e.key === 'Enter') ir(); };
     mapDraw();
   }
@@ -675,7 +679,7 @@
   function imprimir(C) {
     const cb = P.carimbo, linha = (a, b) => b ? '<tr><th>' + a + '</th><td>' + esc(b) + '</td></tr>' : '';
     let coord = '';
-    if (C.georef) { const u = G.utm(C.georef.lat0, C.georef.lng0); coord = 'E ' + fmt(u.e, 0) + ' m · N ' + fmt(u.n, 0) + ' m — SIRGAS 2000 / UTM ' + u.zone + u.hemi; }
+    if (C.georef) { const u = G.utm(C.georef.lat0, C.georef.lng0); coord = G.fmtCoord(C.georef.lat0, C.georef.lng0, 'gms') + ' — E ' + fmt(u.e, 0) + ' m · N ' + fmt(u.n, 0) + ' m (SIRGAS 2000 / UTM ' + u.zone + u.hemi + ')'; }
     $('#print').innerHTML = '<div class="ptop"><div><b>PLANTA DE LAYOUT — LEVANTAMENTO EXPEDITO</b><br>' + esc(cb.empreendimento || P.nome) + '</div><div style="text-align:right">' + esc(cb.empresa) + '<br>' + new Date().toLocaleDateString('pt-BR') + '</div></div>' +
       '<div class="pgrid"><div>' + plantaSVG(C) + '</div><div><h4 style="margin-top:0">Quadro de áreas</h4>' + quadroHTML(C) +
       '<h4>Identificação</h4><table>' + linha('Cliente', cb.cliente) + linha('Endereço', cb.endereco) + linha('Município', cb.municipio) + linha('Centro do prédio', coord) + linha('Resp. técnico', cb.resp) + linha('Registro', cb.registro) + '</table>' +

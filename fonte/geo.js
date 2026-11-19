@@ -198,6 +198,43 @@
     return { e: E, n: Nn, zone, hemi: lat < 0 ? 'S' : 'N' };
   };
 
+  /* ---- Formatos de coordenada ---- */
+  const BANDAS = 'CDEFGHJKLMNPQRSTUVWX';
+  G.fmtCoord = function (lat, lng, modo) {
+    if (modo === 'gms') {
+      const g = (v, pos, neg) => {
+        const h = v < 0 ? neg : pos; v = Math.abs(v);
+        let d = Math.floor(v), m = Math.floor((v - d) * 60), s = (v - d - m / 60) * 3600;
+        if (s >= 59.995) { s = 0; m++; } if (m >= 60) { m = 0; d++; }
+        return d + '°' + String(m).padStart(2, '0') + "'" + s.toFixed(2).replace('.', ',').padStart(5, '0') + '"' + h;
+      };
+      return g(lat, 'N', 'S') + '  ' + g(lng, 'E', 'W');
+    }
+    if (modo === 'utm') {
+      const u = G.utm(lat, lng), band = BANDAS[Math.max(0, Math.min(19, Math.floor((lat + 80) / 8)))];
+      const n = v => Math.round(v).toLocaleString('pt-BR');
+      return 'UTM ' + u.zone + band + '  E ' + n(u.e) + '  N ' + n(u.n) + ' m';
+    }
+    return lat.toFixed(6) + ', ' + lng.toFixed(6);
+  };
+  /* Lê coordenada digitada: decimal (-11.8642, -55.5025) ou GMS (11°51'51"S 55°30'09"W, 11 51 51 S 55 30 9 O). */
+  G.parseCoord = function (txt) {
+    const t = String(txt || '').toUpperCase();
+    const nums = (t.match(/-?\d+(?:[.,]\d+)?/g) || []).map(v => parseFloat(v.replace(',', '.')));
+    const hem = (t.replace(/[^NSEWOL]/g, ' ').match(/\b[NSEWOL]\b/g) || []);
+    let k;
+    if (nums.length === 2) k = 1; else if (nums.length === 4) k = 2; else if (nums.length === 6) k = 3; else return null;
+    const val = arr => { const neg = arr[0] < 0 || Object.is(arr[0], -0); let v = Math.abs(arr[0]) + (arr[1] || 0) / 60 + (arr[2] || 0) / 3600; return neg ? -v : v; };
+    if (k > 1) for (const i of [1, 2, 4, 5]) if (nums[i] != null && i % 3 !== 0 && nums[i] >= 60) return null;
+    let a = val(nums.slice(0, k)), b = val(nums.slice(k));
+    const sinal = (v, h) => (h === 'S' || h === 'W' || h === 'O') ? -Math.abs(v) : (h ? Math.abs(v) : v);
+    let ha = hem[0], hb = hem[1];
+    if (ha && /[EWOL]/.test(ha)) { [a, b] = [b, a]; [ha, hb] = [hb, ha]; }
+    a = sinal(a, ha); b = sinal(b, hb);
+    if (Math.abs(a) > 90 || Math.abs(b) > 180) return null;
+    return [a, b];
+  };
+
   /* ---- Cômodos ---- */
   G.roomPts = function (r) {
     if (r.rect) return [[r.x, r.y], [r.x + r.w, r.y], [r.x + r.w, r.y + r.h], [r.x, r.y + r.h]];
