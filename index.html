@@ -1536,7 +1536,7 @@ tr.tot td{font-weight:700;background:#fafcfb}
     if (map) { map._animatingZoom = false; map.stop(); map.remove(); map = null; }
     let h = '<h2>Contorno do prédio</h2><div class="seg" id="cModo"><button data-m="satelite">Satélite</button><button data-m="arext">AR externo</button><button data-m="medidas">Medidas</button><button data-m="croqui">Só o croqui</button></div>';
     if (c.modo === 'satelite') {
-      h += '<p class="sub">Coloque a mira em cada canto do <b>telhado</b> e toque em “Marcar canto”. Depois feche o contorno. Se a imagem ficar borrada ou cinza, troque a fonte de imagem.</p>' +
+      h += '<p class="sub"><b>Toque em cada canto do telhado</b> na imagem (ou use a mira e “Marcar canto”). Depois toque em “Fechar contorno”. Se a imagem ficar borrada ou cinza, troque a fonte de imagem.</p>' +
         '<div class="row" style="margin-bottom:6px"><span class="sub">Imagem:</span><select id="mCam" class="grow" style="font-size:14px;padding:7px 9px"></select></div><div id="mapwrap"><div id="map"></div><div id="mira"></div><button class="b" id="mGpsMap" title="Minha localização">📍 Minha localização</button></div>' +
         '<div id="maptools"><button class="b p sm" id="mMark">Marcar canto</button><button class="b sm" id="mUndo">Desfazer</button><button class="b sm" id="mClose">Fechar contorno</button><button class="b sm" id="mSq">Esquadrejar</button><button class="b sm d" id="mClear">Recomeçar</button></div>' +
         '<div class="row"><input type="search" id="mCoord" class="grow" placeholder="Ir para: -11.8642, -55.5025" style="font-size:14px;padding:7px 9px"><button class="b sm" id="mIr">Ir</button></div>';
@@ -1644,6 +1644,11 @@ tr.tot td{font-weight:700;background:#fafcfb}
   function mapInitSat() {
     const c = P.cont;
     $('#mMark').onclick = () => { if (c.fechado) { toast('O contorno já está fechado. Arraste os pontos amarelos para corrigir, ou recomece.'); return; } const ct = map.getCenter(); c.roof.push([ct.lat, ct.lng]); save(); mapDraw(); };
+    map.on('click', e => { // toque direto na imagem também marca o canto
+      if (P.cont.modo !== 'satelite' || c.fechado) return;
+      c.roof.push([e.latlng.lat, e.latlng.lng]); save(); mapDraw();
+      if (c.roof.length === 1) toast('Canto 1 marcado. Toque nos outros cantos do telhado e depois em “Fechar contorno”.', 3500);
+    });
     $('#mUndo').onclick = () => { if (c.fechado) { c.fechado = false; } else c.roof.pop(); save(); mapDraw(); contRes(); };
     $('#mClose').onclick = () => {
       if (c.roof.length < 3) { toast('Marque pelo menos 3 cantos.'); return; }
@@ -1958,7 +1963,7 @@ tr.tot td{font-weight:700;background:#fafcfb}
     await DB.open(); lista = await DB.all();
     const u = pref.get('ultimo'); if (u && lista.find(x => x.id === u)) P = lista.find(x => x.id === u);
     go('proj');
-    if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => { });
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname))) navigator.serviceWorker.register('sw.js').catch(() => { });
   })();
 })();
 </script>
