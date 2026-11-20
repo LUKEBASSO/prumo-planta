@@ -200,7 +200,23 @@
 
   /* Gira o cômodo em torno do centro até as paredes ficarem nos eixos e esquadreja.
      Devolve {rect:true,x,y,w,h} para retângulos ou {rect:false,pts}. */
+  G.seCruza = function (pts) {
+    const n = pts.length, cr = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+    for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue;
+      const a = pts[i], b = pts[(i + 1) % n], c = pts[j], d = pts[(j + 1) % n];
+      if (cr(a, b, c) * cr(a, b, d) < 0 && cr(c, d, a) * cr(c, d, b) < 0) return true;
+    }
+    return false;
+  };
+  /* Desfaz polígono cruzado (cantos marcados fora de ordem): reordena os cantos pelo ângulo em volta do centro. */
+  G.descruzar = function (pts) {
+    if (!G.seCruza(pts)) return pts;
+    const c = [pts.reduce((s, p) => s + p[0], 0) / pts.length, pts.reduce((s, p) => s + p[1], 0) / pts.length];
+    return pts.slice().sort((a, b) => Math.atan2(a[1] - c[1], a[0] - c[0]) - Math.atan2(b[1] - c[1], b[0] - c[0]));
+  };
   G.alinhar = function (pts) {
+    pts = G.descruzar(pts);
     const own = G.dominantAngle(pts), c = G.centroid(pts);
     const r = pts.map(p => { const q = G.rot([p[0] - c[0], p[1] - c[1]], -own); return [q[0] + c[0], q[1] + c[1]]; });
     const o = G.orthogonalize(r, 0) || r;
