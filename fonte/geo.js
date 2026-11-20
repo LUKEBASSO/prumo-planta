@@ -198,6 +198,16 @@
     return { e: E, n: Nn, zone, hemi: lat < 0 ? 'S' : 'N' };
   };
 
+  /* Gira o cômodo em torno do centro até as paredes ficarem nos eixos e esquadreja.
+     Devolve {rect:true,x,y,w,h} para retângulos ou {rect:false,pts}. */
+  G.alinhar = function (pts) {
+    const own = G.dominantAngle(pts), c = G.centroid(pts);
+    const r = pts.map(p => { const q = G.rot([p[0] - c[0], p[1] - c[1]], -own); return [q[0] + c[0], q[1] + c[1]]; });
+    const o = G.orthogonalize(r, 0) || r;
+    if (o.length === 4) { const b = G.bbox(o); return { rect: true, x: b.minx, y: b.miny, w: b.w, h: b.h }; }
+    return { rect: false, pts: G.ccw(o) };
+  };
+
   /* ---- Formatos de coordenada ---- */
   const BANDAS = 'CDEFGHJKLMNPQRSTUVWX';
   G.fmtCoord = function (lat, lng, modo) {

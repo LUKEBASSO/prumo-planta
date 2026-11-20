@@ -289,7 +289,7 @@
     if (!poli) h += '<div class="two"><div><label>Largura (m)</label><input type="text" inputmode="decimal" id="rW" value="' + (r ? fmt(r.w) : '') + '" placeholder="0,00"></div>' +
       '<div><label>Comprimento (m)</label><input type="text" inputmode="decimal" id="rH" value="' + (r ? fmt(r.h) : '') + '" placeholder="0,00"></div></div>' +
       '<div class="row" style="margin-top:8px"><button class="b sm" id="rMic">🎤 Falar medidas</button><button class="b sm" id="rTW">📏 Trena AR: largura</button><button class="b sm" id="rTH">📏 Trena AR: comprimento</button></div><p class="sub">Medidas internas, de parede a parede. Na Trena AR, mire as paredes na altura do peito, onde não há móveis.</p>';
-    else h += '<p class="sub">Cômodo medido por AR (' + r.pts.length + ' cantos, ' + fmt(G.absArea(r.pts)) + ' m²).</p><div class="row"><button class="b sm" id="rSq">Esquadrejar paredes</button></div>';
+    else h += '<p class="sub">Cômodo medido por AR (' + r.pts.length + ' cantos, ' + fmt(G.absArea(r.pts)) + ' m²).</p><div class="row"><button class="b sm" id="rSq">Alinhar e esquadrejar</button></div>';
     if (!novo) h += '<label>Fotos do cômodo</label><div class="fotos" id="rF"></div><div class="row" style="margin-top:6px"><button class="b sm" id="rFoto">📷 Tirar / anexar foto</button></div>';
     h += '<div class="row" style="margin-top:16px"><button class="b grow" id="rC">Cancelar</button><button class="b p grow" id="rOk">' + (novo ? 'Adicionar' : 'Salvar') + '</button></div>';
     const s = sheet(h), iN = $('#rN', s), iW = $('#rW', s), iH = $('#rH', s);
@@ -301,7 +301,7 @@
       toast('Ouvi: ' + t);
     });
     if ($('#rTW', s)) { $('#rTW', s).onclick = () => arAbrir('trena', d => { iW.value = fmt(d); toast('Largura: ' + fmt(d) + ' m'); }); $('#rTH', s).onclick = () => arAbrir('trena', d => { iH.value = fmt(d); toast('Comprimento: ' + fmt(d) + ' m'); }); }
-    if ($('#rSq', s)) $('#rSq', s).onclick = () => { const o = G.orthogonalize(r.pts); if (!o) { toast('Não deu para esquadrejar este formato.'); return; } r.pts = o; save(); cqRender(); toast('Paredes esquadrejadas.'); roomSheet(r); };
+    if ($('#rSq', s)) $('#rSq', s).onclick = () => { const a = G.alinhar(r.pts); delete r.pts; delete r.x; delete r.y; delete r.w; delete r.h; Object.assign(r, a); save(); cqRender(); toast(a.rect ? 'Cômodo alinhado e esquadrejado.' : 'Paredes alinhadas e esquadrejadas.'); roomSheet(r); };
     if (!novo) {
       const drawF = () => {
         const f = r.fotos || [];
@@ -778,7 +778,7 @@
           AR.pts.length + ' quina(s). Vá até a próxima quina e marque. Ao terminar a volta, toque em “Concluir contorno”.';
       } else {
         msg = !AR.cur ? 'Mova o celular devagar, apontando para o piso, até aparecer o círculo.' :
-          AR.pts.length ? 'Cômodo ' + (AR.polys.length + 1) + ': ' + AR.pts.length + ' canto(s). Aponte para o próximo canto no piso.' : (AR.polys.length ? AR.polys.length + ' cômodo(s) medidos. Vá para o próximo cômodo sem sair do AR e marque o primeiro canto.' : 'Aponte o círculo para um canto do cômodo, no piso, e toque em “Marcar canto”. Meça todos os cômodos nesta mesma sessão: assim eles já chegam montados.');
+          AR.pts.length ? 'Cômodo ' + (AR.polys.length + 1) + ': ' + AR.pts.length + ' canto(s). Aponte para o próximo canto no piso.' : (AR.polys.length ? AR.polys.length + ' cômodo(s) medidos. Marque o próximo cômodo ou conclua.' : 'Aponte o círculo para um canto do cômodo, no piso, e toque em “Marcar canto”. Pode medir um cômodo por vez ou vários seguidos.');
       }
       $('#artop').textContent = msg;
     };
@@ -814,11 +814,7 @@
     if (P.rooms.length) { const eb = G.bbox(P.rooms.flatMap(G.roomPts)); ox = eb.maxx + 1.5 - all.minx; oy = eb.miny - all.miny; }
     ps.forEach(pts => {
       pts = pts.map(p => [p[0] + ox, p[1] + oy]);
-      const proprio = G.dominantAngle(pts), alinhado = Math.abs(proprio) < 10 * Math.PI / 180;
-      const o = G.orthogonalize(pts, alinhado ? 0 : null);
-      const room = { id: uid(), nome: proxNome(), fotos: [] };
-      if (o && o.length === 4 && alinhado) { const b = G.bbox(o); Object.assign(room, { rect: true, x: b.minx, y: b.miny, w: b.w, h: b.h }); }
-      else Object.assign(room, { rect: false, pts: o || pts });
+      const room = Object.assign({ id: uid(), nome: proxNome(), fotos: [] }, G.alinhar(pts)); // sempre alinhado aos eixos
       P.rooms.push(room);
     });
     save(); cqFit();

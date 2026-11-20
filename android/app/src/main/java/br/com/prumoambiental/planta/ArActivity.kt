@@ -218,7 +218,7 @@ class ArActivity : ComponentActivity(), GLSurfaceView.Renderer {
                 "desfazer" -> if (atuais.isNotEmpty()) atuais.removeAt(atuais.size - 1).detach()
                     else if (fechados.isNotEmpty()) fechados.removeAt(fechados.size - 1).forEach { it.detach() }
                 "fechar" -> if (atuais.size < 3) toast("Marque pelo menos 3 cantos antes de fechar.")
-                    else { fechados.add(atuais.toMutableList()); atuais.clear(); toast("Cômodo fechado. Vá para o próximo sem sair do AR.") }
+                    else { fechados.add(atuais.toMutableList()); atuais.clear(); toast("Cômodo fechado. Marque o próximo ou conclua.") }
                 "fim" -> { finalizar(); return }
             }
         }
@@ -269,8 +269,8 @@ class ArActivity : ComponentActivity(), GLSurfaceView.Renderer {
         else -> when {
             !temAlvo -> "Aponte para o piso e mova o celular devagar até o círculo ficar verde."
             atuais.isNotEmpty() -> "Cômodo ${fechados.size + 1}: ${atuais.size} canto(s). Aponte para o próximo canto no piso."
-            fechados.isNotEmpty() -> "${fechados.size} cômodo(s) medidos. Vá para o próximo cômodo sem sair do AR e marque o primeiro canto."
-            else -> "Mire um canto do cômodo no piso e toque em “Marcar canto”. Meça todos os cômodos nesta mesma sessão."
+            fechados.isNotEmpty() -> "${fechados.size} cômodo(s) medidos. Marque o próximo cômodo ou conclua."
+            else -> "Mire um canto do cômodo no piso e toque em “Marcar canto”. Pode medir um cômodo por vez ou vários seguidos."
         }
     }
 
